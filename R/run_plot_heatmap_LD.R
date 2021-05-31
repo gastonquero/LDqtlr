@@ -1,16 +1,57 @@
-run_plot_heatmap_LD <- function (data.cross = NULL, data.tibble =NULL,  heterozygotes = FALSE){
+# hay que editar
+run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygotes = FALSE, distance.unit = NULL){
+
+  # Nota: se debe crear la estructura del directorio
+
+  print (str_c("Se encontraron " , nchr (data.cross), " grupos de ligamientos")) # verifico el numero de cromosomas
+
+  if   ( distance.unit != "cM" &  distance.unit != "Mb") {
+
+    stop (str_c ("Debe definir una unidad de distancia valida"))
+
+
+  }
+
+  if (is.null (distance.unit)) {
+
+    stop (str_c ("Falta definir unidad de distancia"))
+
+  }
+
+  if   ( distance.unit == "Mb" | distance.unit == "Kb" ) {
+
+    print (str_c ("El mapa es un mapa fisico"))
+
+  }
+
+  if   ( distance.unit == "cM") {
+    print (str_c ("El mapa es un mapa genetico"))
+
+  }
+
+  #  numero maximo de grupos de ligamientos
 
   nchr.max <- nchr (data.cross)
 
   list.chr <- 1:nchr.max
-  #filt.chr = 1
 
+  ### este es temporal para corre el lapply
+
+  #filt.chr = 1
+  ###########
 
   lapply(list.chr, function (filt.chr){
 
-    print (filt.chr)
+    print (str_c("Estimando LD LG= " ,filt.chr))
+
+    ## hago un subset de cada cromosoma
+
     crossobj <- subset(data.cross, chr=filt.chr)
-    chr=filt.chr
+
+    chr <- filt.chr
+
+    #  Esta seccion es para formatear la matriz para para LDheatmap.
+    #  Nota: ver si con los nuevos formaatos cambia o no
 
     data <- NULL
     for (i in 1:length(chr)) {
@@ -37,177 +78,240 @@ run_plot_heatmap_LD <- function (data.cross = NULL, data.tibble =NULL,  heterozy
     }
 
     #### add marker names calculate LD
-    ld <- LD(genos)
+    ### Esta es la funcion que calcula el LD, verificar la documentacion
+    ##
+    ##############
+
+    #######################3
+    # Nota : hay que agregar barra de progreso
+
+    ld <- LD (genos)
+
+    map.cross <- pull.map ( crossobj, as.table = TRUE)
 
     # plot LD heatmap
-    plot.hm <- LDheatmap(ld$"R^2", title=str_c("Pairwise LD_Chr.",filt.chr),
-                         color = colorRampPalette(c("red4", "red","orangered", "orange","yellow1",  "blue4"))(60))
+    # Nota: las figuras se podrian guardar solas como png.
 
+    if   ( distance.unit == "Mb" | distance.unit == "Kb" ) {
 
-    LD.soja.cross.matrix <- plot.hm$LDmatrix
+      plot.hm <- LDheatmap ( ld$"R^2", genetic.distances= map.cross$pos, distances="physical",
+                             title=str_c(id.cross, "Pairwise LD_LG.",filt.chr),
+                             color = colorRampPalette(c("red4", "red","orangered", "orange","yellow1",  "blue4"))(60))
+    }
 
+    if   ( distance.unit == "cM") {
 
-    write.table (LD.soja.cross.matrix ,
-                 file = str_c("./Data/procdata/LD.soja.cross.matrix.",filt.chr,".txt"),
+      plot.hm <- LDheatmap ( ld$"R^2", genetic.distances= map.cross$pos, distances="genetic",
+                             title=str_c(id.cross, "Pairwise LD_LG.",filt.chr),
+                             color = colorRampPalette(c("red4", "red","orangered", "orange","yellow1",  "blue4"))(60))
+    }
+
+    ### esta es la matriz que sale de la funcion LD
+
+    LD.cross.matrix <- plot.hm$LDmatrix
+
+    write.table (LD.cross.matrix ,
+                 file = str_c("./Data/procdata/",id.cross, "_LD.cross.matrix_", filt.chr,".txt"),
                  append = FALSE, quote = TRUE, sep = ",",
                  eol = "\n", na = "NA", dec = ".", row.names = TRUE,
                  col.names = TRUE)
 
-    if(filt.chr < 10 ) {
+    ### genero el df de los marcadores y sus distancias
 
-      soja.cross.tibble_snp <- data.tibble  %>%
-        dplyr::select (starts_with(str_c("S0", filt.chr)))
-    }
-
-    if(filt.chr >= 10 ) {
-
-      soja.cross.tibble_snp <- data.tibble  %>%
-        dplyr::select (starts_with(str_c("S", filt.chr)))
-
-    }
-
-    #soja.cross.chr.tibble_snp.1 <- soja.cross.tibble_snp [-c(1,2),]
+    cross.tibble_dist <- map.cross.1 %>%
+      dplyr::mutate ( mrks  = rownames(map.cross.1)) %>%
+      dplyr::select ( mrks, pos)
 
 
-    soja.cross.tibble_bp <- soja.cross.tibble_snp [2,]
+    cross.tibble_dist <- as_tibble (cross.tibble_dist)
 
-    mkr.chr <- colnames (soja.cross.tibble_snp)
-
-    x.mk <- data.frame (mrks = mkr.chr)
-
-    pos.chr    <- soja.cross.tibble_snp [2,]
-    pos.chr.1  <- data.frame (pos = pos.chr[1,])
-
-    pos.chr.2  <- as.numeric(t(pos.chr.1))
-
-    soja.cross.tibble_bp.1 <- x.mk %>%
-      dplyr::mutate (pos=pos.chr.2)
-
-    ###
-    dt <- soja.cross.tibble_bp.1
+    dt <-  cross.tibble_dist
     list.pos <- (unique (dt$pos))
     list.mrks <- (unique (dt$mrks))
 
-    Z <- matrix (0, nrow=length(list.pos), ncol=length(list.pos))
-    Z <- as.data.frame(Z)
-    colnames(Z) <-list.mrks
-    rownames(Z) <-list.mrks
+    #### aca empieza la distancia
 
-    #### aca empieza la distancia en bp
-    x.bp <- lapply (list.pos, function (filtro.x1) {
-      lapply (list.pos, function (filtro.x2) {
+    print (str_c("Estimando diff.dist LG= " ,filt.chr))
+
+    dt.diff.dist <- bind_rows (lapply (list.pos, function (filtro.x1) {
+
+      #filtro.x1 = 153541
+      #print (filtro.x1)
+
+      dt.dist.2 <- bind_rows ( lapply (list.pos, function (filtro.x2) {
+
+        #filtro.x2 = 293684
+        #print (filtro.x2)
+
         dt.x1 <- dt %>%
           dplyr::filter (pos == filtro.x1)
-        x1    <- dt.x1 [,2]
-        id.x1 <- dt.x1 [,1]
+
         dt.x2 <- dt %>%
           dplyr::filter (pos == filtro.x2)
-        x2    <- dt.x2 [,2]
-        id.x2 <- dt.x2 [,1]
-        dt.z <- abs (x1 - x2)
-        Z ["id.x1","id.x2"] <- dt.z
-      })
-    })
 
-    names(x.bp) <- list.mrks
-    XX.x.bp <- as.data.frame (do.call (cbind, x.bp))
+        dt.z <- data.frame (dt.x1,  dt.x2)
 
-    dt.LD.decay <- lapply (list.mrks, function (filtro) {
+        dt.z <- dt.z  %>%
+          dplyr::mutate (diff.dist = abs (pos - pos.1)) %>%
+          dplyr::select ("mrks", "mrks.1", "diff.dist" ) %>%
+          dplyr::rename (mrk.1 = mrks) %>%
+          dplyr::rename (mrk.2 = mrks.1)
 
-      XX.x.bp.1 <- XX.x.bp %>%
-        dplyr::select (filtro)
-      delta.bp <- unlist (XX.x.bp.1 , use.names=FALSE)
+        #print (dt.z)
 
-      colnames (LD.soja.cross.matrix ) <- list.mrks
-      rownames (LD.soja.cross.matrix) <- list.mrks
-      LD_soja.cross <-  as_tibble(LD.soja.cross.matrix)
-      LD_soja.cross <- LD_soja.cross %>%
-        dplyr::mutate (mrk.id =list.mrks)%>%
+        #return (dt.z)
+
+      }))
+
+    }))
+
+    df.LD.decay <- bind_rows ( lapply (list.mrks, function (filt.mrk) {
+
+      #filtro = "S01_153541"
+
+      #print (filt.mrk)
+
+      dt.diff.dist.mrk <-  dt.diff.dist %>%
+        dplyr::filter (mrk.1 == filt.mrk)
+
+      colnames (LD.cross.matrix ) <- list.mrks
+      rownames (LD.cross.matrix)  <- list.mrks
+
+      LD.cross <-  as_tibble (LD.cross.matrix)
+      LD.cross <- LD.cross %>%
+        dplyr::mutate (mrk.id = list.mrks)%>%
         dplyr::select (mrk.id, everything())
 
-      id <- colnames (XX.x.bp.1)
+      LD.mrk.1 <- LD.cross %>%
+        dplyr::filter (mrk.id== filt.mrk)
 
-      LD_soja.cross.1 <- LD_soja.cross%>%
-        dplyr::filter (mrk.id==id)
+      id.gather <- colnames (LD.mrk.1) [-1]
 
-      id.gather <- colnames (LD_soja.cross.1) [-1]
-
-      LD_soja.cross.2 <- LD_soja.cross.1 %>%
-        gather (id.gather, key="mrk.2" , value = "R2") %>%
+      LD.cross.2 <- LD.mrk.1 %>%
+        gather (all_of (id.gather), key="mrk.2" , value = "R2") %>%
         dplyr::rename (mrk.1 = mrk.id)
 
-      LD_soja.cross.2$mrk.1 <- as.character(LD_soja.cross.2$mrk.1)
+      LD.dist.cross.3 <- LD.cross.2 %>%
+        dplyr::inner_join ( dt.diff.dist.mrk ,  LD.cross.2, by= c("mrk.1", "mrk.2"))
 
+      #return (LD.dist.cross.3)
 
-      colnames (XX.x.bp.1) == unique ( LD_soja.cross.2$mrk.1)
-
-      LD_soja.cross.3 <- LD_soja.cross.2 %>%
-        dplyr::mutate (delta.bp = delta.bp )
-
-      print (LD_soja.cross.3)
-
-
-
-      return ( LD_soja.cross.3)
-
-    })
-
-    df.LD.decay <- as.data.frame (do.call (rbind, dt.LD.decay))
+    }))
 
     df.LD.decay <- df.LD.decay  %>%
-      dplyr::mutate (chrom = str_c ("chr_", filt.chr))%>%
-      dplyr::arrange(delta.bp)%>%
-      dplyr::mutate (delta.bp.1 = delta.bp/1e6)
+      dplyr::mutate (LG = str_c ("lg.", filt.chr)) %>%
+      dplyr::arrange (diff.dist)
 
-    write_delim (df.LD.decay  , path=str_c("./Data/procdata/plot.LD.decay.chr", filt.chr,".txt"),
+    if   ( distance.unit == "Kb" ) {
+
+      df.LD.decay <- df.LD.decay  %>%
+        dplyr::mutate (diff.dist = diff.dist/1e6)
+
+    }
+
+    write_delim (df.LD.decay  , file =str_c("./Data/procdata/", id.cross, "LD.decay.LG", filt.chr,".txt"),
                  delim = ",", na = "NA")
 
-    png (filename = str_c("./Figures/plot.r2.decay.chr_", filt.chr,".png"),
-         width = 480, height = 480, units = "px", pointsize = 12,
-         bg = "white", res = NA)
+    if   ( distance.unit == "Mb" | distance.unit == "Kb" ) {
 
-    plot (x = df.LD.decay$delta.bp.1 , y = df.LD.decay$R2,
-          main=str_c("LD.decay.", filt.chr),
-          pch = 20,
-          type ="n",
-          xaxt="none",
-          yaxt="none",
-          axes = F,
-          xlim = c(0, max (df.LD.decay$delta.bp.1)),
-          ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
-          ylab = expression(LD ~ (r^2)),
-          xlab = expression(Distance ~ (Mb)))
+      png (filename = str_c("./Figures/",id.cross,".LD.decay.LG_", filt.chr,".png"),
+           width = 480, height = 480, units = "px", pointsize = 12,
+           bg = "white", res = NA)
 
-    axis(side = 2, las = 1)
-    x2 <- max (df.LD.decay$delta.bp.1, na.rm = TRUE)
-    axis (side=1,at=seq(0,x2,10),las = 1)
+      plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
+            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
+            pch = 20,
+            type ="n",
+            xaxt="none",
+            yaxt="none",
+            axes = F,
+            xlim = c(0, max (df.LD.decay$diff.dist)),
+            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
+            ylab = expression(LD ~ (r^2)),
+            xlab = expression(Distance ~ (Mb)))
 
-
-    points (df.LD.decay$delta.bp.1,df.LD.decay$R2,
-            pch = 20, cex=1.5, col="gray28")
-    box()
-    dev.off()
-
-    plot (x = df.LD.decay$delta.bp.1 , y = df.LD.decay$R2,
-          main=str_c("LD.decay.", filt.chr),
-          pch = 20,
-          type ="n",
-          xaxt="none",
-          yaxt="none",
-          axes = F,
-          xlim = c(0, max (df.LD.decay$delta.bp.1)),
-          ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
-          ylab = expression(LD ~ (r^2)),
-          xlab = expression(Distance ~ (Mb)))
-
-    axis(side = 2, las = 1)
-    x2 <- max (df.LD.decay$delta.bp.1, na.rm = TRUE)
-    axis (side=1,at=seq(0,x2,10),las = 1)
+      axis(side = 2, las = 1)
+      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
+      axis (side=1,at=seq(0,x2,10),las = 1)
 
 
-    points (df.LD.decay$delta.bp.1,df.LD.decay$R2,
-            pch = 20, cex=1.5, col="gray28")
-    box()
+      points (df.LD.decay$diff.dist,df.LD.decay$R2,
+              pch = 20, cex=1.5, col="gray28")
+      box()
+      dev.off()
+
+      plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
+            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
+            pch = 20,
+            type ="n",
+            xaxt="none",
+            yaxt="none",
+            axes = F,
+            xlim = c(0, max (df.LD.decay$diff.dist)),
+            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
+            ylab = expression(LD ~ (r^2)),
+            xlab = expression(Distance ~ (Mb)))
+
+      axis(side = 2, las = 1)
+      x2 <- max (df.LD.decay$delta.bp, na.rm = TRUE)
+      axis (side=1,at=seq(0,x2,10),las = 1)
+
+      points (df.LD.decay$diff.dist,df.LD.decay$R2,
+              pch = 20, cex=1.5, col="gray28")
+      box()
+    }
+
+    if   ( distance.unit == "cM" ) {
+
+      png (filename = str_c("./Figures/",id.cross,".LD.decay.LG_", filt.chr,".png"),
+           width = 480, height = 480, units = "px", pointsize = 12,
+           bg = "white", res = NA)
+
+      plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
+            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
+            pch = 20,
+            type ="n",
+            xaxt="none",
+            yaxt="none",
+            axes = F,
+            xlim = c(0, max (df.LD.decay$diff.dist)),
+            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
+            ylab = expression(LD ~ (r^2)),
+            xlab = expression(Distance ~ (cM)))
+
+      axis(side = 2, las = 1)
+      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
+      axis (side=1,at=seq(0,x2,1),las = 1)
+
+
+      points (df.LD.decay$diff.dist,df.LD.decay$R2,
+              pch = 20, cex=1.5, col="gray28")
+      box()
+      dev.off()
+
+      plot (x = df.LD.decay$diff.dist, y = df.LD.decay$R2,
+            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
+            pch = 20,
+            type ="n",
+            xaxt="none",
+            yaxt="none",
+            axes = F,
+            xlim = c(0, max (df.LD.decay$diff.dist)),
+            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
+            ylab = expression(LD ~ (r^2)),
+            xlab = expression(Distance ~ (cM)))
+
+      axis(side = 2, las = 1)
+      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
+      axis (side=1,at=seq(0,x2,1),las = 1)
+
+
+      points (df.LD.decay$diff.dist,df.LD.decay$R2,
+              pch = 20, cex=1.5, col="gray28")
+      box()
+    }
 
   })
+
 }
+
