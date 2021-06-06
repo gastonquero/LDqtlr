@@ -1,11 +1,15 @@
 # hay que editar
-run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygotes = FALSE, distance.unit = NULL){
+
+run_plot_heatmap_LD <- function (id.cross = NULL ,
+                                 data.cross = NULL,
+                                 heterozygotes = FALSE,
+                                 distance.unit = NULL) {
 
   # Nota: se debe crear la estructura del directorio
 
   print (str_c("Se encontraron " , nchr (data.cross), " grupos de ligamientos")) # verifico el numero de cromosomas
 
-  if   ( distance.unit != "cM" &  distance.unit != "Mb") {
+  if   ( distance.unit != "cM" &  distance.unit != "bp" &  distance.unit != "kb" & distance.unit != "Mb") {
 
     stop (str_c ("Debe definir una unidad de distancia valida"))
 
@@ -18,7 +22,7 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
 
   }
 
-  if   ( distance.unit == "Mb" | distance.unit == "Kb" ) {
+  if   (distance.unit == "bp" | distance.unit == "Kb" | distance.unit == "Mb"  ) {
 
     print (str_c ("El mapa es un mapa fisico"))
 
@@ -51,7 +55,7 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
     chr <- filt.chr
 
     #  Esta seccion es para formatear la matriz para para LDheatmap.
-    #  Nota: ver si con los nuevos formaatos cambia o no
+    #  Nota: ver si con los nuevos formatos cambia o no
 
     data <- NULL
     for (i in 1:length(chr)) {
@@ -92,17 +96,21 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
     # plot LD heatmap
     # Nota: las figuras se podrian guardar solas como png.
 
-    if   ( distance.unit == "Mb" | distance.unit == "Kb" ) {
+    if   ( distance.unit == "bp" | distance.unit == "Kb" | distance.unit == "Mb" ) {
 
-      plot.hm <- LDheatmap ( ld$"R^2", genetic.distances= map.cross$pos, distances="physical",
-                             title=str_c(id.cross, "Pairwise LD_LG.",filt.chr),
+      plot.hm <- LDheatmap ( ld$"R^2",
+                             genetic.distances= map.cross$pos,
+                             distances="physical",
+                             title=str_c(id.cross, "_Pairwise LD_LG.",filt.chr),
                              color = colorRampPalette(c("red4", "red","orangered", "orange","yellow1",  "blue4"))(60))
+
     }
 
     if   ( distance.unit == "cM") {
 
-      plot.hm <- LDheatmap ( ld$"R^2", genetic.distances= map.cross$pos, distances="genetic",
-                             title=str_c(id.cross, "Pairwise LD_LG.",filt.chr),
+      plot.hm <- LDheatmap ( ld$"R^2", genetic.distances= map.cross$pos,
+                             distances="genetic",
+                             title=str_c(id.cross, "Pairwise LD_LG.", filt.chr),
                              color = colorRampPalette(c("red4", "red","orangered", "orange","yellow1",  "blue4"))(60))
     }
 
@@ -118,8 +126,8 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
 
     ### genero el df de los marcadores y sus distancias
 
-    cross.tibble_dist <- map.cross.1 %>%
-      dplyr::mutate ( mrks  = rownames(map.cross.1)) %>%
+    cross.tibble_dist <- map.cross %>%
+      dplyr::mutate ( mrks  = rownames(map.cross)) %>%
       dplyr::select ( mrks, pos)
 
 
@@ -133,14 +141,16 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
 
     print (str_c("Estimando diff.dist LG= " ,filt.chr))
 
+
+
     dt.diff.dist <- bind_rows (lapply (list.pos, function (filtro.x1) {
 
-      #filtro.x1 = 153541
+      #filtro.x1 =  277230
       #print (filtro.x1)
 
       dt.dist.2 <- bind_rows ( lapply (list.pos, function (filtro.x2) {
 
-        #filtro.x2 = 293684
+        #filtro.x2 =  2415604
         #print (filtro.x2)
 
         dt.x1 <- dt %>%
@@ -165,9 +175,11 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
 
     }))
 
+    start.time <- Sys.time()
+
     df.LD.decay <- bind_rows ( lapply (list.mrks, function (filt.mrk) {
 
-      #filtro = "S01_153541"
+      #filt.mrk= "JHI-Hv50k-2016-270"
 
       #print (filt.mrk)
 
@@ -198,9 +210,22 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
 
     }))
 
+
+
+
     df.LD.decay <- df.LD.decay  %>%
       dplyr::mutate (LG = str_c ("lg.", filt.chr)) %>%
       dplyr::arrange (diff.dist)
+
+    ### verificar estas medidas
+
+    if   ( distance.unit == "bp" ) {
+
+      df.LD.decay <- df.LD.decay  %>%
+        dplyr::mutate (diff.dist = (diff.dist*1e-6))
+
+    }
+
 
     if   ( distance.unit == "Kb" ) {
 
@@ -212,7 +237,7 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
     write_delim (df.LD.decay  , file =str_c("./Data/procdata/", id.cross, "LD.decay.LG", filt.chr,".txt"),
                  delim = ",", na = "NA")
 
-    if   ( distance.unit == "Mb" | distance.unit == "Kb" ) {
+    if   ( distance.unit == "bp" | distance.unit == "Kb" | distance.unit == "bp" ) {
 
       png (filename = str_c("./Figures/",id.cross,".LD.decay.LG_", filt.chr,".png"),
            width = 480, height = 480, units = "px", pointsize = 12,
@@ -253,65 +278,64 @@ run_plot_heatmap_LD <- function(id.cross = NULL , data.cross = NULL,  heterozygo
             xlab = expression(Distance ~ (Mb)))
 
       axis(side = 2, las = 1)
-      x2 <- max (df.LD.decay$delta.bp, na.rm = TRUE)
+      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
       axis (side=1,at=seq(0,x2,10),las = 1)
 
-      points (df.LD.decay$diff.dist,df.LD.decay$R2,
+      points (df.LD.decay$diff.dist, df.LD.decay$R2,
               pch = 20, cex=1.5, col="gray28")
       box()
     }
 
-    if   ( distance.unit == "cM" ) {
+    #if   ( distance.unit == "cM" ) {
 
-      png (filename = str_c("./Figures/",id.cross,".LD.decay.LG_", filt.chr,".png"),
-           width = 480, height = 480, units = "px", pointsize = 12,
-           bg = "white", res = NA)
+    #png (filename = str_c("./Figures/",id.cross,".LD.decay.LG_", filt.chr,".png"),
+    #     width = 480, height = 480, units = "px", pointsize = 12,
+    #    bg = "white", res = NA)
 
-      plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
-            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
-            pch = 20,
-            type ="n",
-            xaxt="none",
-            yaxt="none",
-            axes = F,
-            xlim = c(0, max (df.LD.decay$diff.dist)),
-            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
-            ylab = expression(LD ~ (r^2)),
-            xlab = expression(Distance ~ (cM)))
+    #  plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
+    #       main=str_c(id.cross,".LD.decay.LG_", filt.chr),
+    #        pch = 20,
+    #       type ="n",
+    #      xaxt="none",
+    #     yaxt="none",
+    #    axes = F,
+    #   xlim = c(0, max (df.LD.decay$diff.dist)),
+    #  ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
+    # ylab = expression(LD ~ (r^2)),
+    #xlab = expression(Distance ~ (cM)))
 
-      axis(side = 2, las = 1)
-      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
-      axis (side=1,at=seq(0,x2,1),las = 1)
-
-
-      points (df.LD.decay$diff.dist,df.LD.decay$R2,
-              pch = 20, cex=1.5, col="gray28")
-      box()
-      dev.off()
-
-      plot (x = df.LD.decay$diff.dist, y = df.LD.decay$R2,
-            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
-            pch = 20,
-            type ="n",
-            xaxt="none",
-            yaxt="none",
-            axes = F,
-            xlim = c(0, max (df.LD.decay$diff.dist)),
-            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
-            ylab = expression(LD ~ (r^2)),
-            xlab = expression(Distance ~ (cM)))
-
-      axis(side = 2, las = 1)
-      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
-      axis (side=1,at=seq(0,x2,1),las = 1)
+    # axis(side = 2, las = 1)
+    #x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
+    #axis (side=1,at=seq(0,x2,1),las = 1)
 
 
-      points (df.LD.decay$diff.dist,df.LD.decay$R2,
-              pch = 20, cex=1.5, col="gray28")
-      box()
-    }
+    #  points (df.LD.decay$diff.dist, df.LD.decay$R2,
+    #pch = 20, cex=1.5, col="gray28")
+    # box()
+    #dev.off()
+
+    #plot (x = df.LD.decay$diff.dist, y = df.LD.decay$R2,
+    #     main=str_c(id.cross,".LD.decay.LG_", filt.chr),
+    #pch = 20,
+    #type ="n",
+    #xaxt="none",
+    #yaxt="none",
+    #axes = F,
+    #xlim = c(0, max (df.LD.decay$diff.dist)),
+    #ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
+    #ylab = expression(LD ~ (r^2)),
+    #xlab = expression(Distance ~ (cM)))
+
+    #  axis(side = 2, las = 1)
+    #x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
+    #axis (side=1,at=seq(0,x2,1),las = 1)
+
+
+    #points (df.LD.decay$diff.dist,df.LD.decay$R2,
+    #pch = 20, cex=1.5, col="gray28")
+    #box()
+    #}#
 
   })
 
 }
-
