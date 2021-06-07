@@ -88,7 +88,7 @@ distance.unit = "cM"
 
 run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2=0.5, l3=0.75, seq1= NULL, distance.unit = NULL) {
 
-  if   ( distance.unit != "cM" &  distance.unit != "Mb" & distance.unit != "Kb" & distance.unit != "bp" ) {
+  if   ( distance.unit != "cM" &  distance.unit != "Mb") {
 
     stop (str_c ("Debe definir una unidad de distancia valida"))
 
@@ -101,7 +101,7 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
 
   }
 
-  if   ( distance.unit == "Mb" | distance.unit == "Kb" | distance.unit == "bp") {
+  if   ( distance.unit == "Mb") {
 
     print (str_c ("El mapa es un mapa fisico"))
 
@@ -133,17 +133,17 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
       print (filt.dist)
 
       ############### hay que revisar estos numeros ##############
-      # if   ( distance.unit == "Mb" ) {
+      # if ( distance.unit == "Mb" ) {
 
-      x.dist.Mb <- dat.1 %>%
-        dplyr::filter (diff.dist <= filt.dist * 1e5)
+       x.dist.Mb <- dat.1 %>%
+                    dplyr::filter (diff.dist <= filt.dist * 1e5)
 
       bin <- (filt.dist* 1e5)/1e6
 
       x.dist.Mb.1 <- x.dist.Mb %>%
-        dplyr::mutate (bin = str_c (bin, "Mb"))
+                      dplyr::mutate (bin = str_c (bin, "Mb"))
 
-      #print (x.dist.Mb.1)
+      #return (x.dist.Mb.1)
 
       #}
 
@@ -171,7 +171,8 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
     #print (ggv)
 
 
-    ggh <- gghistogram (df.hist.plot, y = "..density..", x = "R2", facet.by = "bin",title =filt.crom,
+    ggh <- gghistogram (df.hist.plot, y = "..density..", x = "R2",
+                        facet.by = "bin",title =filt.crom,
                         #fill = "lightgray",
                         fill = "bin", palette =   "RdBu",
                         add = "median", rug = TRUE)
@@ -181,7 +182,7 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
       ggexport(filename = str_c("./Figures/ggh_",id.cross, "_", filt.crom,".png"))
 
 
-    qqunif <- ggplot(df.hist.plot, aes(R2, colour =  bin , fill = bin), size=1.2) + stat_ecdf() +
+    qqunif <- ggplot(df.hist.plot, aes(R2, colour =  bin , fill = bin), size= 2) + stat_ecdf() +
       theme_bw()+
       stat_function(fun=punif,args=list(0,1))+
       scale_color_manual(values=c("green", "black", "blue", "red"))+
