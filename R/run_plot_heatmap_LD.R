@@ -9,7 +9,7 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
 
   print (str_c("Se encontraron " , nchr (data.cross), " grupos de ligamientos")) # verifico el numero de cromosomas
 
-  if   ( distance.unit != "cM" &  distance.unit != "bp" &  distance.unit != "kb" & distance.unit != "Mb") {
+  if   ( distance.unit != "cM" & distance.unit != "Mb") {
 
     stop (str_c ("Debe definir una unidad de distancia valida"))
 
@@ -22,7 +22,7 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
 
   }
 
-  if   (distance.unit == "bp" | distance.unit == "Kb" | distance.unit == "Mb"  ) {
+  if   ( distance.unit == "Mb"  ) {
 
     print (str_c ("El mapa es un mapa fisico"))
 
@@ -94,9 +94,8 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
     map.cross <- pull.map ( crossobj, as.table = TRUE)
 
     # plot LD heatmap
-    # Nota: las figuras se podrian guardar solas como png.
 
-    if   ( distance.unit == "bp" | distance.unit == "Kb" | distance.unit == "Mb" ) {
+    if   ( distance.unit == "Mb" ) {
 
       plot.hm <- LDheatmap ( ld$"R^2",
                              genetic.distances= map.cross$pos,
@@ -142,40 +141,32 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
     print (str_c("Estimando diff.dist LG= " ,filt.chr))
 
 
-
+    #start.time <- Sys.time()
     dt.diff.dist <- bind_rows (lapply (list.pos, function (filtro.x1) {
 
-      #filtro.x1 =  277230
+      #filtro.x1 =  0.277230
       #print (filtro.x1)
 
-      dt.dist.2 <- bind_rows ( lapply (list.pos, function (filtro.x2) {
+      dt.x1 <- dt %>%
+        dplyr::filter (pos == filtro.x1)
 
-        #filtro.x2 =  2415604
-        #print (filtro.x2)
+      dt.x2 <- dt
 
-        dt.x1 <- dt %>%
-          dplyr::filter (pos == filtro.x1)
+      dt.z <- data.frame (dt.x1,  dt.x2)
 
-        dt.x2 <- dt %>%
-          dplyr::filter (pos == filtro.x2)
-
-        dt.z <- data.frame (dt.x1,  dt.x2)
-
-        dt.z <- dt.z  %>%
-          dplyr::mutate (diff.dist = abs (pos - pos.1)) %>%
-          dplyr::select ("mrks", "mrks.1", "diff.dist" ) %>%
-          dplyr::rename (mrk.1 = mrks) %>%
-          dplyr::rename (mrk.2 = mrks.1)
-
-        #print (dt.z)
-
-        #return (dt.z)
-
-      }))
+      dt.z <- dt.z  %>%
+        dplyr::mutate (diff.dist = abs (pos - pos.1)) %>%
+        dplyr::select ("mrks", "mrks.1", "diff.dist" ) %>%
+        dplyr::rename (mrk.1 = mrks) %>%
+        dplyr::rename (mrk.2 = mrks.1)
 
     }))
 
-    start.time <- Sys.time()
+    #end.time <- Sys.time()
+    #time.taken <- end.time - start.time
+    #time.taken
+
+    #start.time <- Sys.time()
 
     df.LD.decay <- bind_rows ( lapply (list.mrks, function (filt.mrk) {
 
@@ -184,33 +175,36 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
       #print (filt.mrk)
 
       dt.diff.dist.mrk <-  dt.diff.dist %>%
-        dplyr::filter (mrk.1 == filt.mrk)
+        dplyr::filter (mrk.1 == filt.mrk)  # las diff de distancias de un marcador contra el resto
 
       colnames (LD.cross.matrix ) <- list.mrks
       rownames (LD.cross.matrix)  <- list.mrks
 
-      LD.cross <-  as_tibble (LD.cross.matrix)
+      LD.cross <-  as_tibble (LD.cross.matrix) # convierto en tibble la matriz de R2 que calcula ld
+
       LD.cross <- LD.cross %>%
-        dplyr::mutate (mrk.id = list.mrks)%>%
+        dplyr::mutate (mrk.id = list.mrks)%>% ## agrego una columna
         dplyr::select (mrk.id, everything())
 
-      LD.mrk.1 <- LD.cross %>%
-        dplyr::filter (mrk.id== filt.mrk)
+      LD.mrk.1 <- LD.cross %>%                          # me quedo con el marcador para el que calcule las distancias
+        dplyr::filter (mrk.id== filt.mrk)     # aca estan los r2 de ese marcador y el resto
 
       id.gather <- colnames (LD.mrk.1) [-1]
 
-      LD.cross.2 <- LD.mrk.1 %>%
+      LD.cross.2 <- LD.mrk.1 %>%           # traspongo el tibble de R2
         gather (all_of (id.gather), key="mrk.2" , value = "R2") %>%
         dplyr::rename (mrk.1 = mrk.id)
 
-      LD.dist.cross.3 <- LD.cross.2 %>%
+      LD.dist.cross.3 <- LD.cross.2 %>% # aca uno los datos de distancia y R2
         dplyr::inner_join ( dt.diff.dist.mrk ,  LD.cross.2, by= c("mrk.1", "mrk.2"))
 
-      #return (LD.dist.cross.3)
+      return (LD.dist.cross.3)
 
     }))
 
-
+    #end.time <- Sys.time()
+    #time.taken <- end.time - start.time
+    #time.taken
 
 
     df.LD.decay <- df.LD.decay  %>%
@@ -219,71 +213,41 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
 
     ### verificar estas medidas
 
-    if   ( distance.unit == "bp" ) {
-
-      df.LD.decay <- df.LD.decay  %>%
-        dplyr::mutate (diff.dist = (diff.dist*1e-6))
-
-    }
-
-
-    if   ( distance.unit == "Kb" ) {
-
-      df.LD.decay <- df.LD.decay  %>%
-        dplyr::mutate (diff.dist = diff.dist/1e6)
-
-    }
-
     write_delim (df.LD.decay  , file =str_c("./Data/procdata/", id.cross, "LD.decay.LG", filt.chr,".txt"),
                  delim = ",", na = "NA")
 
-    if   ( distance.unit == "bp" | distance.unit == "Kb" | distance.unit == "bp" ) {
+    if   (distance.unit == "Mb" ) {
 
-      png (filename = str_c("./Figures/",id.cross,".LD.decay.LG_", filt.chr,".png"),
-           width = 480, height = 480, units = "px", pointsize = 12,
-           bg = "white", res = NA)
+      df.LD.decay.NA <- df.LD.decay %>%
+        dplyr::filter (!is.na (R2))
 
-      plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
-            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
-            pch = 20,
-            type ="n",
-            xaxt="none",
-            yaxt="none",
-            axes = F,
-            xlim = c(0, max (df.LD.decay$diff.dist)),
-            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
-            ylab = expression(LD ~ (r^2)),
-            xlab = expression(Distance ~ (Mb)))
-
-      axis(side = 2, las = 1)
       x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
-      axis (side=1,at=seq(0,x2,10),las = 1)
 
+      if (x2 > 100) {
 
-      points (df.LD.decay$diff.dist,df.LD.decay$R2,
-              pch = 20, cex=1.5, col="gray28")
-      box()
-      dev.off()
+        plot.LD.decay <-  ggscatter (df.LD.decay.NA, x = "diff.dist", y = "R2",
+                                     title =str_c(id.cross,".LD.decay.LG_", filt.chr)) +
+          scale_x_continuous (name="(Distance (Mb)",
+                              breaks =seq(0,x2,100),
+                              #labels=NULL,
+                              limits=c(0, x2))
+      }
 
-      plot (x = df.LD.decay$diff.dist , y = df.LD.decay$R2,
-            main=str_c(id.cross,".LD.decay.LG_", filt.chr),
-            pch = 20,
-            type ="n",
-            xaxt="none",
-            yaxt="none",
-            axes = F,
-            xlim = c(0, max (df.LD.decay$diff.dist)),
-            ylim = c(0, max (df.LD.decay$R2, na.rm = TRUE)),
-            ylab = expression(LD ~ (r^2)),
-            xlab = expression(Distance ~ (Mb)))
+      if (x2 < 100) {
 
-      axis(side = 2, las = 1)
-      x2 <- max (df.LD.decay$diff.dist, na.rm = TRUE)
-      axis (side=1,at=seq(0,x2,10),las = 1)
+        plot.LD.decay <-  ggscatter (df.LD.decay.NA, x = "diff.dist", y = "R2",
+                                     title =str_c(id.cross,".LD.decay.LG_", filt.chr)) +
+          scale_x_continuous (name="(Distance (Mb)",
+                              breaks =seq(0,x2,10),
+                              #labels=NULL,
+                              limits=c(0, x2))
+      }
 
-      points (df.LD.decay$diff.dist, df.LD.decay$R2,
-              pch = 20, cex=1.5, col="gray28")
-      box()
+      plot.LD.decay  %>%
+        ggexport(filename = str_c("./Figures/ plot.LD.decay.",chr,".png"))
+
+      print (plot.LD.decay)
+
     }
 
     #if   ( distance.unit == "cM" ) {
