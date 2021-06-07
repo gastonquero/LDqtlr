@@ -147,6 +147,10 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
 
       #}
 
+
+
+
+
       #########################################################################
 
       ############### hay que revisar estos numeros ##############
@@ -193,6 +197,59 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
 
     qqunif %>%
       ggexport(filename = str_c("./Figures/qqunif_",id.cross, "_", filt.crom,".png"))
+
+    # Nota: aca los estoy estoy tomando cada 0.1 Mb
+
+         x.ddist  <- max (dat.1$diff.dist)
+
+         list.seqMb <- seq (from = 0, to = x.ddist , by = 0.1)
+
+    #filt.distMb <- 0.5
+    df.QQ.seq.Mb <- bind_rows (lapply (list.seqMb, function (filt.distMb){
+
+     x.ini.Mb <- dat.1 %>%
+                 dplyr::filter (diff.dist <= filt.distMb)
+
+    QQ <- quantile (x.ini.Mb$R2)
+
+    l1 <- l1
+    l2 <- l2
+    l3 <- l3
+      q1 <- quantile (QQ, l1)
+      q2 <- quantile (QQ, l2)
+      q3 <- quantile (QQ, l3)
+
+     XX <- data.frame( HUMk=round (q1 [[1]],2) ,  H1= round (q2 [[1]],2), HLMk = round (q3 [[1]],2), chrom = filt.crom)
+
+    dt.QQ.seq.Mb <- XX %>%
+                    dplyr::mutate (inter.Mb = filt.distMb ) %>%
+                    dplyr::select (chrom, inter.b, HUMk,   H1,  HLMk )
+
+
+
+
+    df.QQ.seq.Mb.long <- df.QQ.seq.Mb %>%
+                          pivot_longer( ! c(chrom,inter.Mb), names_to = "cat.LD", values_to = "unqq.R2")
+
+
+    qq.scatt <- ggscatter (df.QQ.seq.Mb.long, x = "inter.Mb", y = "unqq.R2",
+                         title = str_c("Caida de qqR2 en funcion del bin", id.cross, "_", filt.crom),
+                         color = "cat.LD", shape = "cat.LD",
+                        palette = c("navyblue", "gray48", "darkorange"),
+                       add = "loess", rug= TRUE)
+
+    print (qq.scatt)
+
+    qq.scatt  %>%
+     ggexport(filename = str_c("./Figures/qq.scatt_",id.cross, "_", filt.crom,".png"))
+
+   return (dt.QQ.seq.Mb)
+     }))
+
+
+
+
+
 
     # if   ( distance.unit == "cM" ) {
 
