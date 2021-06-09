@@ -118,7 +118,7 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
     LD.cross.matrix <- plot.hm$LDmatrix
 
     write.table (LD.cross.matrix ,
-                 file = str_c("./Data/procdata/",id.cross, "_LD.cross.matrix_", filt.chr,".txt"),
+                 file = str_c("./Data/procdata/",id.cross, "_LD.cross.matrix_chr", filt.chr,".txt"),
                  append = FALSE, quote = TRUE, sep = ",",
                  eol = "\n", na = "NA", dec = ".", row.names = TRUE,
                  col.names = TRUE)
@@ -141,7 +141,7 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
     print (str_c("Estimando diff.dist LG= " ,filt.chr))
 
 
-    #start.time <- Sys.time()
+    start.time <- Sys.time()
     dt.diff.dist <- bind_rows (lapply (list.pos, function (filtro.x1) {
 
       #filtro.x1 =  0.277230
@@ -162,15 +162,15 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
 
     }))
 
-    #end.time <- Sys.time()
-    #time.taken <- end.time - start.time
-    #time.taken
+    end.time <- Sys.time()
+    time.taken <- end.time - start.time
+    time.taken
 
-    #start.time <- Sys.time()
+    start.time <- Sys.time()
 
     df.LD.decay <- bind_rows ( lapply (list.mrks, function (filt.mrk) {
 
-      #filt.mrk= "JHI-Hv50k-2016-270"
+      # filt.mrk= "JHI-Hv50k-2016-270"
 
       #print (filt.mrk)
 
@@ -202,9 +202,9 @@ run_plot_heatmap_LD <- function (id.cross = NULL ,
 
     }))
 
-    #end.time <- Sys.time()
-    #time.taken <- end.time - start.time
-    #time.taken
+    end.time <- Sys.time()
+    time.taken <- end.time - start.time
+    time.taken
 
 
     df.LD.decay <- df.LD.decay  %>%
