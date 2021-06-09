@@ -86,6 +86,7 @@ l3=0.75
 seq1 = c(0.5, 1,10, 50)
 distance.unit = "cM"
 
+
 run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2=0.5, l3=0.75, seq1= NULL, distance.unit = NULL) {
 
   if   ( distance.unit != "cM" &  distance.unit != "Mb") {
@@ -114,11 +115,12 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
 
 
   list.chrom <- unique (data$chrom)
-  #filt.crom =2  ###
+  filt.crom =1  ###
 
   df.qq <- bind_rows (lapply (list.chrom, function (filt.crom){
 
     print(filt.crom)
+    ### aca se puede en lugar de filtra r2 NA reemplazar por R2 =1
 
     dat.1 <- data %>%
       dplyr::filter (chrom == filt.crom) %>%
@@ -126,7 +128,7 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
 
     list.dist <- seq1
 
-    # filt.dist = 1 ######!!!!!!!
+    #filt.dist = 1 ######!!!!!!!
 
     df.hist.plot <- bind_rows (lapply (list.dist, function (filt.dist){
 
@@ -135,13 +137,13 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
       ############### hay que revisar estos numeros ##############
       # if ( distance.unit == "Mb" ) {
 
-       x.dist.Mb <- dat.1 %>%
-                    dplyr::filter (diff.dist <= filt.dist * 1e5)
+      x.dist.Mb <- dat.1 %>%
+        dplyr::filter (diff.dist <= filt.dist * 1e5)
 
       bin <- (filt.dist* 1e5)/1e6
 
       x.dist.Mb.1 <- x.dist.Mb %>%
-                      dplyr::mutate (bin = str_c (bin, "Mb"))
+        dplyr::mutate (bin = str_c (bin, "Mb"))
 
       #return (x.dist.Mb.1)
 
@@ -180,75 +182,71 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
                         #fill = "lightgray",
                         fill = "bin", palette =   "RdBu",
                         add = "median", rug = TRUE)
-    print (ggh)
+    #print (ggh)
 
     ggh  %>%
       ggexport(filename = str_c("./Figures/ggh_",id.cross, "_", filt.crom,".png"))
 
 
-    qqunif <- ggplot(df.hist.plot, aes(R2, colour =  bin , fill = bin), size= 2) + stat_ecdf() +
+    qqunif <- ggplot (df.hist.plot, aes(R2, colour=bin, group=bin ), size= 1.3)  + stat_ecdf() +
       theme_bw()+
       stat_function(fun=punif,args=list(0,1))+
-      scale_color_manual(values=c("green", "black", "blue", "red"))+
+      scale_color_manual(values=c("black", "orange","blue", "red"))+
       labs(title=str_c("ECDF and theoretical CDF","_", filt.crom)) +
       labs(y = "Theoretical Quantiles", x = "Sample Quantiles")
 
-    print (qqunif)
+    #print (qqunif)
 
     qqunif %>%
       ggexport(filename = str_c("./Figures/qqunif_",id.cross, "_", filt.crom,".png"))
 
     # Nota: aca los estoy estoy tomando cada 0.1 Mb
 
-         x.ddist  <- max (dat.1$diff.dist)
+    x.ddist  <- max (dat.1$diff.dist)
 
-         list.seqMb <- seq (from = 0, to = x.ddist , by = 0.1)
+    list.seqMb <- seq (from = 0.1, to = x.ddist , by = 0.1)
 
-    #filt.distMb <- 0.5
+
+    #filt.distMb <- 0.1
     df.QQ.seq.Mb <- bind_rows (lapply (list.seqMb, function (filt.distMb){
 
-     x.ini.Mb <- dat.1 %>%
-                 dplyr::filter (diff.dist <= filt.distMb)
+      #print (filt.distMb)
+      x.ini.Mb <- dat.1 %>%
+        dplyr::filter (diff.dist <= filt.distMb)
 
-    QQ <- quantile (x.ini.Mb$R2)
+      QQ <- quantile (x.ini.Mb$R2, na.rm = TRUE)
 
-    l1 <- l1
-    l2 <- l2
-    l3 <- l3
+      l1 <- l1
+      l2 <- l2
+      l3 <- l3
       q1 <- quantile (QQ, l1)
       q2 <- quantile (QQ, l2)
       q3 <- quantile (QQ, l3)
 
-     XX <- data.frame( HUMk=round (q1 [[1]],2) ,  H1= round (q2 [[1]],2), HLMk = round (q3 [[1]],2), chrom = filt.crom)
+      XX <- data.frame ( HUMk=round (q1 [[1]],2) ,  H1= round (q2 [[1]],2), HLMk = round (q3 [[1]],2), chrom = filt.crom)
 
-    dt.QQ.seq.Mb <- XX %>%
-                    dplyr::mutate (inter.Mb = filt.distMb ) %>%
-                    dplyr::select (chrom, inter.b, HUMk,   H1,  HLMk )
-
-
+      df.QQ.seq.Mb <- XX %>%
+        dplyr::mutate (inter.Mb = filt.distMb ) %>%
+        dplyr::select (chrom, inter.Mb, HUMk,   H1,  HLMk )
 
 
-    df.QQ.seq.Mb.long <- df.QQ.seq.Mb %>%
-                          pivot_longer( ! c(chrom,inter.Mb), names_to = "cat.LD", values_to = "unqq.R2")
+      df.QQ.seq.Mb.long <- df.QQ.seq.Mb %>%
+        pivot_longer( ! c(chrom,inter.Mb), names_to = "cat.LD", values_to = "unqq.R2")
+
+    }))
+
+    qq.scatt <- ggscatter (df.QQ.seq.Mb, x = "inter.Mb", y = "unqq.R2",
+                           title = str_c("Caida de qqR2 en funcion del bin_",
+                                         id.cross, "_Chr.", filt.crom),
+                           color = "cat.LD", shape = "cat.LD",
+                           palette = c("navyblue", "gray48", "darkorange"))
 
 
-    qq.scatt <- ggscatter (df.QQ.seq.Mb.long, x = "inter.Mb", y = "unqq.R2",
-                         title = str_c("Caida de qqR2 en funcion del bin", id.cross, "_", filt.crom),
-                         color = "cat.LD", shape = "cat.LD",
-                        palette = c("navyblue", "gray48", "darkorange"),
-                       add = "loess", rug= TRUE)
-
-    print (qq.scatt)
 
     qq.scatt  %>%
-     ggexport(filename = str_c("./Figures/qq.scatt_",id.cross, "_", filt.crom,".png"))
+      ggexport (qq.scatt , filename = str_c("./Figures/qq.scatt_",id.cross, "_", filt.crom,".png"))
 
-   return (dt.QQ.seq.Mb)
-     }))
-
-
-
-
+    print (qq.scatt)
 
 
     # if   ( distance.unit == "cM" ) {
@@ -300,8 +298,6 @@ run_table_quantiles <- function (id.cross=NULL,data= NULL, ini = 1, l1= 0.25, l2
   }))
   return (df.qq)
 }
-
-
 
 
 quantiles.EEMAC <- run_table_quantiles (id.cross = "EEMAC.cross.1",
